@@ -93,43 +93,46 @@ with open(os.path.join(args.input_dir, 'charmap_inv.pickle'), 'rb') as f:
     
 fake_inputs = models.Generator(args.batch_size, args.seq_length, args.layer_dim, len(charmap))
 
-with tf.Session() as session:
+#with tf.Session() as session:
+checkpoint = tf.train.Checkpoint()
+checkpoint.restore(args.checkpoint).expect_partial()  # Replaced session-based loading with this
 
-    def generate_samples():
-        samples = session.run(fake_inputs)
-        samples = np.argmax(samples, axis=2)
-        decoded_samples = []
-        for i in range(len(samples)):
-            decoded = []
-            for j in range(len(samples[i])):
-                decoded.append(inv_charmap[samples[i][j]])
-            decoded_samples.append(tuple(decoded))
-        return decoded_samples
+def generate_samples():
+    #samples = session.run(fake_inputs)
+    samples = fake_inputs.numpy()  # Eager execution automatically runs operations, no session.run()    
+    samples = np.argmax(samples, axis=2)
+    decoded_samples = []
+    for i in range(len(samples)):
+        decoded = []
+        for j in range(len(samples[i])):
+            decoded.append(inv_charmap[samples[i][j]])
+        decoded_samples.append(tuple(decoded))
+    return decoded_samples
 
-    def save(samples):
-        with open(args.output, 'a') as f:
-                for s in samples:
-                    s = "".join(s).replace('`', '')
-                    f.write(s + "\n")
+def save(samples):
+    with open(args.output, 'a') as f:
+            for s in samples:
+                s = "".join(s).replace('`', '')
+                f.write(s + "\n")
 
-    saver = tf.train.Saver()
-    saver.restore(session, args.checkpoint)
+saver = tf.train.Checkpoint()
+#saver.restore(session, args.checkpoint)
 
-    samples = []
-    then = time.time()
-    start = time.time()
-    for i in range(int(args.num_samples / args.batch_size)):
+samples = []
+then = time.time()
+start = time.time()
+for i in range(int(args.num_samples / args.batch_size)):
         
-        samples.extend(generate_samples())
+    samples.extend(generate_samples())
 
-        # append to output file every 1000 batches
-        if i % 1000 == 0 and i > 0: 
+    # append to output file every 1000 batches
+    if i % 1000 == 0 and i > 0: 
             
-            save(samples)
-            samples = [] # flush
+        save(samples)
+        samples = [] # flush
 
-            print('wrote {} samples to {} in {:.2f} seconds. {} total.'.format(1000 * args.batch_size, args.output, time.time() - then, i * args.batch_size))
-            then = time.time()
+        print('wrote {} samples to {} in {:.2f} seconds. {} total.'.format(1000 * args.batch_size, args.output, time.time() - then, i * args.batch_size))
+        then = time.time()
     
-    save(samples)
+save(samples)
 print('\nFinished in {:.2f} seconds'.format(time.time() - start))
