@@ -12,6 +12,7 @@ import tflib.ops.linear
 import tflib.ops.conv1d
 import utils
 import models
+tf.compat.v1.disable_eager_execution()
 
 '''
 python sample.py \
@@ -93,8 +94,8 @@ with open(os.path.join(args.input_dir, 'charmap_inv.pickle'), 'rb') as f:
     
 fake_inputs = models.Generator(args.batch_size, args.seq_length, args.layer_dim, len(charmap))
 
-with tf.Session() as session:
-
+with tf.compat.v1.Session() as session:
+    session.run(tf.compat.v1.global_variables_initializer())
     def generate_samples():
         samples = session.run(fake_inputs)
         samples = np.argmax(samples, axis=2)
@@ -112,7 +113,7 @@ with tf.Session() as session:
                     s = "".join(s).replace('`', '')
                     f.write(s + "\n")
 
-    saver = tf.train.Saver()
+    saver = tf.compat.v1.train.Saver()
     saver.restore(session, args.checkpoint)
 
     samples = []
